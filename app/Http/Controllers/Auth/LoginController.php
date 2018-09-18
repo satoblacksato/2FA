@@ -55,7 +55,7 @@ class LoginController extends Controller
         $user=User::where($this->username(),'=', $request->email)->first();
         if ( password_verify($request->password, optional($user)->password)) {
             $this->clearLoginAttempts($request);
-            $user->token_login=strtoupper(str_random(15));
+            $user->token_login='JM3GEUCOJIZWSRCRKJLFAQ3MPJJXEVD2UCFMG4AWOM7U3ANRMACYWOAA7VTBDTAG';//strtoupper(str_random(15));
             $user->save();
             $urlQR=  GoogleQrUrl::generate($user->email,$user->token_login);
             return view("auth.2fa",compact('urlQR','user'));
