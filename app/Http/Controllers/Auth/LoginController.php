@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\User;
+use BaconQrCode\Renderer\Image\ImagickImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Auth;
 use Hash;
 use Sonata\GoogleAuthenticator\GoogleQrUrl;
+use Google2FA;
+use BaconQrCode\Writer as BaconQrCodeWriter;
 
 class LoginController extends Controller
 {
@@ -55,9 +60,17 @@ class LoginController extends Controller
         $user=User::where($this->username(),'=', $request->email)->first();
         if ( password_verify($request->password, optional($user)->password)) {
             $this->clearLoginAttempts($request);
-            $user->token_login='JM3GEUCOJIZWSRCRKJLFAQ3MPJJXEVD2UCFMG4AWOM7U3ANRMACYWOAA7VTBDTAG';//strtoupper(str_random(15));
+
+            $user->token_login=Google2FA::generateSecretKey();
             $user->save();
-            $urlQR=  GoogleQrUrl::generate($user->email,$user->token_login);
+            $url = Google2FA::getQRCodeUrl('HOLA', $user->email, $user->token_login);
+            $renderer = new ImageRenderer(
+                new RendererStyle(200),
+                new ImagickImageBackEnd()
+            );
+            $bacon = new BaconQrCodeWriter($renderer);
+            $data = $bacon->writeString($url, 'utf-8');
+            $urlQR= 'data:image/png;base64,'.base64_encode($data);
             return view("auth.2fa",compact('urlQR','user'));
         }
         $this->incrementLoginAttempts($request);
@@ -66,8 +79,11 @@ class LoginController extends Controller
 
     public function login2FA(Request $request,User $user){
         $this->validate($request,['code_verification'=>'required']);
-        $googleAUTH  = new \Google\Authenticator\GoogleAuthenticator();
-        if ($googleAUTH->checkCode($user->token_login,$request->code_verification)) {
+
+        $window = 8; // 8 keys (respectively 4 minutes) past and future
+        $valid = Google2FA::verifyKey($user->token_login, $request->code_verification, $window);
+
+        if ($valid) {
             $request->session()->regenerate();
             \Illuminate\Support\Facades\Auth::login($user);
             return  redirect()->intended($this->redirectPath());
