@@ -58,17 +58,19 @@ class LoginController extends Controller
         $user = User::where($this->username(), '=', $request->email)->first();
         if (password_verify($request->password, optional($user)->password)) {
             $this->clearLoginAttempts($request);
+            $urlQR='';
+            if(is_null($user->token_login)) {
+                $user->token_login = Google2FA::generateSecretKey();
+                $user->save();
 
-            $user->token_login = Google2FA::generateSecretKey();
-            $user->save();
+                $bacon = new BaconQrCodeWriter( new ImageRenderer(
+                    new RendererStyle(200),
+                    new ImagickImageBackEnd()
+                ));
 
-            $bacon = new BaconQrCodeWriter( new ImageRenderer(
-                new RendererStyle(200),
-                new ImagickImageBackEnd()
-            ));
-
-            $data = $bacon->writeString(Google2FA::getQRCodeUrl(config('app.name'), $user->email, $user->token_login), 'utf-8');
-            $urlQR = 'data:image/png;base64,' . base64_encode($data);
+                $data = $bacon->writeString(Google2FA::getQRCodeUrl(config('app.name'), $user->email, $user->token_login), 'utf-8');
+                $urlQR = 'data:image/png;base64,' . base64_encode($data);
+            }
             return view("auth.2fa", compact('urlQR', 'user'));
         }
         $this->incrementLoginAttempts($request);

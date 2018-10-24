@@ -12,7 +12,9 @@
                             @csrf
                             <div class="form-group row">
                                 <div class="col-lg-4">
-                                    <img id="imgQR" src="{{$urlQR}}"/>
+                                   @if(empty($urlQR))
+                                        <img id="imgQR" src="{{$urlQR}}"/>
+                                   @endif
                                 </div>
                                 <div class="col-lg-8">
                                     <div class="form-group">
