@@ -53,29 +53,50 @@ class LoginController extends Controller
 
         if ($this->hasTooManyLoginAttempts($request)) {
             $this->fireLockoutEvent($request);
+
             return $this->sendLockoutResponse($request);
         }
+
         $user = User::where($this->username(), '=', $request->email)->first();
+
         if (password_verify($request->password, optional($user)->password)) {
             $this->clearLoginAttempts($request);
-            $urlQR='';
-            if(is_null($user->token_login)) {
-                $user->token_login = Google2FA::generateSecretKey();
-                $user->save();
 
-                $bacon = new BaconQrCodeWriter( new ImageRenderer(
-                    new RendererStyle(200),
-                    new ImagickImageBackEnd()
-                ));
+            $urlQR = $this->canGenerateSecretKey($user);
 
-                $data = $bacon->writeString(Google2FA::getQRCodeUrl(config('app.name'), $user->email, $user->token_login), 'utf-8');
-                $urlQR = 'data:image/png;base64,' . base64_encode($data);
-            }
             return view("auth.2fa", compact('urlQR', 'user'));
         }
+
         $this->incrementLoginAttempts($request);
+
         return $this->sendFailedLoginResponse($request);
     }
+
+    public function canGenerateSecretKey($user){
+        if(is_null($user->token_login)){
+            $user->update(['token_login' => Google2FA::generateSecretKey()]);
+            return $this->createUserUrlQR($user);
+        }
+        return null;
+    }
+
+    public function createUserUrlQR($user)
+    {
+        $bacon = new BaconQrCodeWriter(new ImageRenderer(
+            new RendererStyle(200),
+            new ImagickImageBackEnd()
+        ));
+
+        $data = $bacon->writeString(
+            Google2FA::getQRCodeUrl(
+                config('app.name'),
+                $user->email,
+                $user->token_login
+            ), 'utf-8');
+
+        return 'data:image/png;base64,' . base64_encode($data);
+    }
+
 
     public function login2FA(Request $request, User $user)
     {
