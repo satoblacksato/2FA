@@ -62,7 +62,7 @@ class LoginController extends Controller
         if (password_verify($request->password, optional($user)->password)) {
             $this->clearLoginAttempts($request);
 
-            $urlQR = $this->canGenerateSecretKey($user);
+            $urlQR = $this->canGenerateAndCreateUrlQR($user);
 
             return view("auth.2fa", compact('urlQR', 'user'));
         }
@@ -72,9 +72,10 @@ class LoginController extends Controller
         return $this->sendFailedLoginResponse($request);
     }
 
-    public function canGenerateSecretKey($user){
+    public function canGenerateAndCreateUrlQR($user){
         if(is_null($user->token_login)){
             $user->update(['token_login' => Google2FA::generateSecretKey()]);
+
             return $this->createUserUrlQR($user);
         }
         return null;
